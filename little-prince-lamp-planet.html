@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>어린왕자 - 가로등 행성</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'Georgia', serif; }
+  canvas { display: block; }
+
+  #title-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, #0a0a2e 0%, #000005 70%);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+    transition: opacity 1.5s ease;
+  }
+  #title-screen.hidden { opacity: 0; pointer-events: none; }
+  .title-main { font-size: 52px; color: #f5e642; letter-spacing: 8px;
+    text-shadow: 0 0 30px rgba(245,230,66,0.6); font-style: italic; margin-bottom: 8px; }
+  .title-sub { font-size: 22px; color: #a8d8f0; letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(168,216,240,0.5); margin-bottom: 60px; }
+  #start-btn {
+    padding: 16px 50px; font-size: 18px; letter-spacing: 4px;
+    background: transparent; border: 2px solid #f5e642; color: #f5e642;
+    cursor: pointer; pointer-events: all; transition: all 0.3s;
+    font-family: 'Georgia', serif; box-shadow: 0 0 20px rgba(245,230,66,0.2);
+  }
+  #start-btn:hover { background: rgba(245,230,66,0.15); box-shadow: 0 0 40px rgba(245,230,66,0.5); transform: scale(1.05); }
+
+  #mode-select {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center; z-index: 50; opacity: 0; transition: opacity 0.8s;
+    pointer-events: none;
+  }
+  #mode-select.visible { opacity: 1; pointer-events: all; }
+  .mode-title { font-size: 26px; color: #f5e642; letter-spacing: 3px; margin-bottom: 30px;
+    text-shadow: 0 0 20px rgba(245,230,66,0.6); }
+  .mode-btn {
+    display: block; width: 220px; padding: 14px 30px; margin: 12px auto;
+    font-size: 16px; letter-spacing: 3px; background: rgba(0,0,0,0.7);
+    border: 2px solid; cursor: pointer; pointer-events: all;
+    transition: all 0.3s; font-family: 'Georgia', serif;
+  }
+  .mode-btn.story { border-color: #f5e642; color: #f5e642; }
+  .mode-btn.story:hover { background: rgba(245,230,66,0.2); box-shadow: 0 0 30px rgba(245,230,66,0.4); }
+  .mode-btn.free { border-color: #a8d8f0; color: #a8d8f0; }
+  .mode-btn.free:hover { background: rgba(168,216,240,0.2); box-shadow: 0 0 30px rgba(168,216,240,0.4); }
+
+  #story-bubble {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(5,5,30,0.92); border: 1px solid rgba(245,230,66,0.5);
+    border-radius: 12px; padding: 20px 30px; max-width: 600px; width: 90%;
+    z-index: 50; opacity: 0; transition: opacity 0.5s; pointer-events: none;
+    box-shadow: 0 0 30px rgba(245,230,66,0.15);
+  }
+  #story-bubble.visible { opacity: 1; pointer-events: all; }
+  #story-bubble.clickable { cursor: pointer; }
+  #story-bubble.clickable:hover { border-color: rgba(245,230,66,0.8); }
+  .bubble-speaker { font-size: 13px; color: #f5e642; letter-spacing: 2px; margin-bottom: 8px; opacity: 0.8; }
+  .bubble-text { font-size: 16px; color: #e8e8e8; line-height: 1.9; white-space: pre-line; }
+  .bubble-next { text-align: right; margin-top: 12px; font-size: 12px; color: #a8d8f0; letter-spacing: 2px; opacity: 0.7; }
+
+  #free-ui {
+    position: fixed; top: 20px; right: 20px; z-index: 50;
+    opacity: 0; transition: opacity 0.5s; pointer-events: none;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 12px;
+  }
+  #free-ui.visible { opacity: 1; pointer-events: all; }
+  .ui-panel { background: rgba(5,5,30,0.85); border: 1px solid rgba(168,216,240,0.3);
+    border-radius: 10px; padding: 12px 16px; }
+  .ui-label { font-size: 11px; color: #a8d8f0; letter-spacing: 2px; margin-bottom: 6px; opacity: 0.8; }
+  #speed-slider { -webkit-appearance: none; width: 160px; height: 3px;
+    background: rgba(168,216,240,0.3); border-radius: 2px; outline: none; }
+  #speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
+    background: #a8d8f0; border-radius: 50%; cursor: pointer; box-shadow: 0 0 8px rgba(168,216,240,0.6); }
+  .ui-btn { padding: 8px 18px; font-size: 12px; letter-spacing: 2px; background: transparent;
+    cursor: pointer; transition: all 0.3s; font-family: 'Georgia', serif; }
+  #pause-btn { border: 1px solid #f5e642; color: #f5e642; border-radius: 6px; }
+  #pause-btn:hover { background: rgba(245,230,66,0.15); }
+  #exit-btn { border: 1px solid rgba(255,100,100,0.5); color: rgba(255,150,150,0.9); border-radius: 6px; }
+  #exit-btn:hover { background: rgba(255,100,100,0.15); }
+
+  #hint-text {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(168,216,240,0.7); letter-spacing: 2px;
+    z-index: 50; opacity: 0; transition: opacity 0.5s; pointer-events: none;
+    background: rgba(0,0,0,0.5); padding: 7px 16px; border-radius: 20px;
+  }
+  #hint-text.visible { opacity: 1; }
+
+  #drag-hint {
+    position: fixed; bottom: 66px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: rgba(168,216,240,0.5); letter-spacing: 2px;
+    z-index: 50; opacity: 0; transition: opacity 0.5s; pointer-events: none;
+  }
+  #drag-hint.visible { opacity: 1; }
+
+  .float-bubble {
+    position: fixed; background: rgba(255,255,240,0.97);
+    border-radius: 16px; padding: 7px 13px; font-size: 13px;
+    color: #333; white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.25);
+    border: 1px solid rgba(245,230,66,0.5);
+  }
+  .float-bubble::after {
+    content:''; position:absolute; bottom:-8px; left:50%;
+    transform:translateX(-50%); border:5px solid transparent;
+    border-top-color: rgba(255,255,240,0.97);
+  }
+  .float-bubble.visible { opacity: 1; }
+
+  #time-indicator {
+    position: fixed; top: 20px; left: 20px; z-index: 50;
+    font-size: 13px; color: rgba(255,255,255,0.65); letter-spacing: 2px;
+    opacity: 0; transition: opacity 0.5s; pointer-events: none;
+    background: rgba(0,0,0,0.45); padding: 6px 14px; border-radius: 20px;
+  }
+  #time-indicator.visible { opacity: 1; }
+
+  #fade-overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background:#000; z-index:200; opacity:0; pointer-events:none;
+  }
+  #loading {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background:#000010; z-index:500; display:flex; align-items:center;
+    justify-content:center; color:#f5e642; font-size:18px; letter-spacing:4px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">로딩 중...</div>
+<div id="fade-overlay"></div>
+
+<div id="title-screen">
+  <div style="text-align:center">
+    <div class="title-main">어린왕자</div>
+    <div class="title-sub">가로등 행성</div>
+    <button id="start-btn">시 작 하 기</button>
+  </div>
+</div>
+
+<div id="mode-select">
+  <div class="mode-title">모드를 선택하세요</div>
+  <button class="mode-btn story" id="story-mode-btn">📖 이야기 모드</button>
+  <button class="mode-btn free" id="free-mode-btn">🌍 자유 모드</button>
+</div>
+
+<div id="story-bubble">
+  <div class="bubble-speaker" id="bubble-speaker"></div>
+  <div class="bubble-text" id="bubble-text"></div>
+  <div class="bubble-next">클릭하여 계속 ▶</div>
+</div>
+
+<div id="free-ui">
+  <div class="ui-panel">
+    <div class="ui-label">자전 속도</div>
+    <input type="range" id="speed-slider" min="0.1" max="5" step="0.1" value="1">
+  </div>
+  <button class="ui-btn" id="pause-btn">⏸ 일시정지</button>
+  <button class="ui-btn" id="exit-btn">✕ 나가기</button>
+</div>
+
+<div id="time-indicator">🌙 밤</div>
+<div id="hint-text">캐릭터를 클릭해 보세요!</div>
+<div id="drag-hint">🖱 드래그로 행성을 돌려보세요</div>
+
+<div class="float-bubble" id="prince-bubble"></div>
+<div class="float-bubble" id="lamplighter-bubble"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── RENDERER ───────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x010115);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 2.5, 9);
+camera.lookAt(0, 0.5, 0);
+
+// ─── STATE ──────────────────────────────────
+let gameState = 'loading';
+let isPaused   = false;
+let rotationSpeed = 1.0;
+let lampOn  = true;
+let storyStep = 0;
+let isDay   = false;
+let spaceAngle = 0;
+let lamplighterAnimating = false;
+let lamplighterAnimFrame = 0;
+let lamplighterAction = 'idle';
+let flyingPhase=0, flyingT=0, flyingActive=false;
+let exitPhase=0,   exitT=0,   exitActive=false;
+let elapsed=0, wingFlapT=0;
+// camera drag
+let isDragging=false, dragPrev={x:0,y:0};
+let camTheta=0, camPhi=0.28, camRadius=9;
+const CAM_TARGET = new THREE.Vector3(0,0.5,0);
+
+// ─── STARS ──────────────────────────────────
+(function(){
+  const geo=new THREE.BufferGeometry(), cnt=2500, pos=new Float32Array(cnt*3);
+  for(let i=0;i<cnt;i++){
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), r=120+Math.random()*180;
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.sin(ph)*Math.sin(th); pos[i*3+2]=r*Math.cos(ph);
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:0xffffff,size:0.35,sizeAttenuation:true})));
+  const yg=new THREE.BufferGeometry(), yp=new Float32Array(80*3);
+  for(let i=0;i<80;i++){yp[i*3]=(Math.random()-.5)*80; yp[i*3+1]=(Math.random()-.5)*50; yp[i*3+2]=(Math.random()-.5)*40-5;}
+  yg.setAttribute('position',new THREE.BufferAttribute(yp,3));
+  scene.add(new THREE.Points(yg,new THREE.PointsMaterial({color:0xf5e642,size:0.55})));
+})();
+
+// ─── SPACE GROUP (태양+달 공전) ──────────────
+const spaceGroup = new THREE.Group();
+scene.add(spaceGroup);
+
+// 태양 (어린왕자 스타일 — 원 + 삼각 광선 + 얼굴)
+function createSun(){
+  const g=new THREE.Group();
+  // 뒤 글로우
+  g.add(Object.assign(new THREE.Mesh(
+    new THREE.CircleGeometry(1.5,32),
+    new THREE.MeshBasicMaterial({color:0xffbb00,transparent:true,opacity:0.18,depthWrite:false})
+  ),{renderOrder:0}));
+  // 본체 원
+  const core=new THREE.Mesh(new THREE.CircleGeometry(0.92,32),new THREE.MeshBasicMaterial({color:0xffe040}));
+  core.renderOrder=1; g.add(core);
+  // 광선 (삼각형 10개 큰 것)
+  const rayN=10;
+  for(let i=0;i<rayN;i++){
+    const a=(i/rayN)*Math.PI*2;
+    const sh=new THREE.Shape();
+    const len=1.0+(i%3)*0.28, w=0.12;
+    sh.moveTo(-w,0); sh.lineTo(w,0); sh.lineTo(0,len); sh.closePath();
+    const ray=new THREE.Mesh(new THREE.ShapeGeometry(sh),new THREE.MeshBasicMaterial({color:0xffdd33,transparent:true,opacity:0.88}));
+    ray.position.set(Math.cos(a)*0.95,Math.sin(a)*0.95,0);
+    ray.rotation.z=a-Math.PI/2; ray.renderOrder=1; g.add(ray);
+  }
+  // 짧은 광선 10개
+  for(let i=0;i<rayN;i++){
+    const a=((i+0.5)/rayN)*Math.PI*2;
+    const sh=new THREE.Shape(); sh.moveTo(-0.07,0); sh.lineTo(0.07,0); sh.lineTo(0,0.5); sh.closePath();
+    const ray=new THREE.Mesh(new THREE.ShapeGeometry(sh),new THREE.MeshBasicMaterial({color:0xffee88,transparent:true,opacity:0.65}));
+    ray.position.set(Math.cos(a)*0.95,Math.sin(a)*0.95,0);
+    ray.rotation.z=a-Math.PI/2; ray.renderOrder=1; g.add(ray);
+  }
+  // 눈
+  const eyeM=new THREE.MeshBasicMaterial({color:0xbb7700});
+  const eG=new THREE.CircleGeometry(0.09,10);
+  [-0.26,0.26].forEach(ex=>{
+    const e=new THREE.Mesh(eG,eyeM); e.position.set(ex,0.2,0.02); e.renderOrder=2; g.add(e);
+  });
+  // 입 (웃는 곡선 — 작은 호)
+  const smSh=new THREE.Shape(); smSh.absarc(0,0.06,0.22,Math.PI+0.45,-0.45,true);
+  const sm=new THREE.Mesh(new THREE.ShapeGeometry(smSh),new THREE.MeshBasicMaterial({color:0xbb7700,transparent:true,opacity:0.8}));
+  sm.position.set(0,-0.12,0.02); sm.renderOrder=2; g.add(sm);
+  return g;
+}
+const sunMesh=createSun();
+sunMesh.position.set(16,0,0);
+spaceGroup.add(sunMesh);
+
+const sunLight=new THREE.PointLight(0xfff5cc,3.0,80);
+sunLight.position.copy(sunMesh.position);
+spaceGroup.add(sunLight);
+
+// 달 (간단 원)
+const moonMesh=new THREE.Mesh(
+  new THREE.CircleGeometry(0.55,20),
+  new THREE.MeshBasicMaterial({color:0xdde8ff,transparent:true,opacity:0.82})
+);
+moonMesh.position.set(-16,0,0);
+spaceGroup.add(moonMesh);
+
+// ─── PLANET (고정) ───────────────────────────
+const planetGroup=new THREE.Group();
+scene.add(planetGroup);
+
+const planetMat=new THREE.MeshPhongMaterial({color:0xeee4c0,shininess:8});
+const planet=new THREE.Mesh(new THREE.SphereGeometry(1.8,32,32),planetMat);
+planet.receiveShadow=true; planet.castShadow=true;
+planetGroup.add(planet);
+planetGroup.add(new THREE.Mesh(
+  new THREE.SphereGeometry(1.93,32,32),
+  new THREE.MeshPhongMaterial({color:0xc8e0ff,transparent:true,opacity:0.1,side:THREE.FrontSide,depthWrite:false})
+));
+for(let i=0;i<5;i++){
+  const r=0.18+Math.random()*0.22, a=(i/5)*Math.PI*2+0.5;
+  const b=new THREE.Mesh(new THREE.SphereGeometry(r,8,8),new THREE.MeshPhongMaterial({color:0xd8ccaa}));
+  b.position.set(Math.cos(a)*1.82,(Math.random()-.5)*0.3,Math.sin(a)*1.82);
+  planetGroup.add(b);
+}
+
+// ─── LAMP ────────────────────────────────────
+const lampGroup=new THREE.Group();
+planetGroup.add(lampGroup);
+
+const poleMat=new THREE.MeshPhongMaterial({color:0x666666});
+const poleM=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.055,2.0,8),poleMat);
+poleM.position.y=1.0; lampGroup.add(poleM);
+const armM=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.55,8),poleMat);
+armM.rotation.z=Math.PI/2; armM.position.set(0.28,2.0,0); lampGroup.add(armM);
+const shadeM=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.2,0.24,12),new THREE.MeshPhongMaterial({color:0x444444}));
+shadeM.position.set(0.55,2.0,0); lampGroup.add(shadeM);
+
+const bulbMat=new THREE.MeshPhongMaterial({color:0xffee88,emissive:0xffcc44,emissiveIntensity:2.5,transparent:true,opacity:0.95});
+const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.1,12,12),bulbMat);
+bulb.position.set(0.55,1.92,0); lampGroup.add(bulb);
+
+const lampLight=new THREE.PointLight(0xffdd66,2.5,5);
+lampLight.position.set(0.55,1.92,0); lampGroup.add(lampLight);
+
+const glowMat=new THREE.MeshBasicMaterial({color:0xffee88,transparent:true,opacity:0.25,side:THREE.FrontSide,depthWrite:false});
+const lampGlow=new THREE.Mesh(new THREE.SphereGeometry(0.25,12,12),glowMat);
+lampGlow.position.set(0.55,1.92,0); lampGroup.add(lampGlow);
+
+lampGroup.position.set(0,1.8,0);
+
+// ─── LAMPLIGHTER ─────────────────────────────
+const lamplighterGroup=new THREE.Group();
+planetGroup.add(lamplighterGroup);
+
+function createLamplighter(){
+  const g=new THREE.Group();
+  const M=(geo,c,px=0,py=0,pz=0,rx=0,ry=0,rz=0,nm='')=>{
+    const m=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:c}));
+    m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); if(nm)m.name=nm; return m;
+  };
+  g.add(M(new THREE.CylinderGeometry(0.14,0.17,0.42,8),0x3a6e30, 0,0.21,0));
+  g.add(M(new THREE.SphereGeometry(0.135,12,12),0xf0b888, 0,0.57,0));
+  const hM=new THREE.MeshPhongMaterial({color:0x2a2a0a});
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.035,12),hM),{position:new THREE.Vector3(0,0.68,0)}));
+  g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.125,0.155,0.2,12),hM),{position:new THREE.Vector3(0,0.79,0)}));
+  const lM=new THREE.MeshPhongMaterial({color:0x2a2a0a});
+  g.add(M(new THREE.CylinderGeometry(0.05,0.05,0.32,6),0x2a2a0a, -0.075,-0.04,0));
+  g.add(M(new THREE.CylinderGeometry(0.05,0.05,0.32,6),0x2a2a0a,  0.075,-0.04,0));
+  const rArm=M(new THREE.CylinderGeometry(0.04,0.04,0.32,6),0x3a6e30, 0.19,0.32,0, 0,0,-0.4,'rightArm');
+  g.add(rArm);
+  g.add(M(new THREE.CylinderGeometry(0.04,0.04,0.32,6),0x3a6e30, -0.19,0.32,0, 0,0,0.4));
+  const stick=M(new THREE.CylinderGeometry(0.022,0.022,1.3,6),0x8B6914, 0.33,0.65,0, 0,0,-0.3,'stick');
+  g.add(stick);
+  const fl=M(new THREE.SphereGeometry(0.065,8,8),0xff8800, 0.7,1.25,0, 0,0,0,'stickFlame');
+  fl.material.emissive=new THREE.Color(0xff4400); fl.material.emissiveIntensity=1.5;
+  fl.material.transparent=true; fl.material.opacity=0.85; g.add(fl);
+  return g;
+}
+const lamplighter=createLamplighter();
+lamplighterGroup.position.set(0,1.8,0);
+lamplighterGroup.rotation.y=-0.5;
+lamplighterGroup.add(lamplighter);
+
+// ─── LITTLE PRINCE ───────────────────────────
+const princeGroup=new THREE.Group();
+planetGroup.add(princeGroup);
+
+function createPrince(sc=1){
+  const g=new THREE.Group(); g.scale.setScalar(sc);
+  const M=(geo,c,px=0,py=0,pz=0,rx=0,ry=0,rz=0)=>{
+    const m=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:c}));
+    m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); return m;
+  };
+  g.add(M(new THREE.CylinderGeometry(0.11,0.14,0.38,8),0x5a9e4a, 0,0.19,0));
+  g.add(M(new THREE.SphereGeometry(0.14,12,12),0xf5d080, 0,0.52,0));
+  g.add(M(new THREE.SphereGeometry(0.145,12,8,0,Math.PI*2,0,Math.PI*0.6),0xf5d44a, 0,0.52,0));
+  const sc2=new THREE.Mesh(new THREE.TorusGeometry(0.115,0.04,6,12),new THREE.MeshPhongMaterial({color:0xf5d010}));
+  sc2.position.set(0,0.38,0); sc2.rotation.x=0.3; g.add(sc2);
+  g.add(M(new THREE.CylinderGeometry(0.045,0.045,0.28,6),0x5a9e4a, -0.06,-0.04,0));
+  g.add(M(new THREE.CylinderGeometry(0.045,0.045,0.28,6),0x5a9e4a,  0.06,-0.04,0));
+  g.add(M(new THREE.CylinderGeometry(0.035,0.035,0.28,6),0x5a9e4a,  0.16,0.28,0, 0,0,-0.5));
+  g.add(M(new THREE.CylinderGeometry(0.035,0.035,0.28,6),0x5a9e4a, -0.16,0.28,0, 0,0,0.5));
+  return g;
+}
+
+const prince=createPrince();
+princeGroup.add(prince);
+
+// ★ 어린왕자: 행성 표면, 아저씨(lamplighterGroup) 옆에 세우기
+// lamplighterGroup은 planetGroup 기준 (0,1.8,0) + rotation.y=-0.5
+// 어린왕자는 lamplighterGroup 위치에서 약간 y축 회전으로 옆에
+princeGroup.position.set(0, 1.8, 0);
+// 아저씨와 같은 위치(행성 꼭대기)에서 약간 회전으로 옆에 세움
+// y축 회전으로 lampGroup과 아저씨 사이 공간에 위치
+princeGroup.rotation.y = Math.PI * 0.45;  // 가로등 쪽을 바라보며 옆에
+princeGroup.visible = false;
+
+// ─── BIRDS ───────────────────────────────────
+function createBird(sz=1){
+  const g=new THREE.Group();
+  const bM=new THREE.MeshPhongMaterial({color:0x88bbcc,side:THREE.DoubleSide});
+  const bd=new THREE.Mesh(new THREE.CylinderGeometry(0.04*sz,0.06*sz,0.25*sz,6),new THREE.MeshPhongMaterial({color:0x99bbcc}));
+  bd.rotation.z=Math.PI/2; g.add(bd);
+  const ws=new THREE.Shape();
+  ws.moveTo(0,0); ws.bezierCurveTo(0.15*sz,0.06*sz,0.26*sz,0.16*sz,0.32*sz,0);
+  ws.bezierCurveTo(0.2*sz,-0.08*sz,0.1*sz,-0.05*sz,0,0);
+  const lw=new THREE.Mesh(new THREE.ShapeGeometry(ws),bM); lw.name='leftWing'; lw.position.z=0.02; g.add(lw);
+  const rw=new THREE.Mesh(new THREE.ShapeGeometry(ws),bM); rw.name='rightWing'; rw.rotation.y=Math.PI; rw.position.z=-0.02; g.add(rw);
+  const hd=new THREE.Mesh(new THREE.SphereGeometry(0.07*sz,8,8),new THREE.MeshPhongMaterial({color:0x77aabb}));
+  hd.position.set(0.17*sz,0.025*sz,0); g.add(hd);
+  return g;
+}
+const birdPos=[[-0.8,1.5,0.1],[-0.3,1.8,-0.2],[0.3,1.6,0.2],[0.8,1.9,-0.1],
+  [-1.2,1.2,-0.15],[1.3,1.4,0.05],[-0.5,2.1,0.3],[0.5,2.0,-0.25],[0.0,2.2,0.15],[-1.0,1.7,0.2]];
+
+function makeFlock(){
+  const f=new THREE.Group();
+  f.add(createPrince(1.0));
+  birdPos.forEach(p=>{
+    const b=createBird(0.8); b.position.set(...p); b.rotation.y=0.1; f.add(b);
+    const lg=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(p[0]*0.3,p[1]*0.3,p[2]*0.3),new THREE.Vector3(...p)]);
+    f.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x888888,transparent:true,opacity:0.5})));
+  });
+  f.scale.setScalar(1.2); return f;
+}
+const titleFlock=makeFlock(); scene.add(titleFlock); titleFlock.position.set(-12,2,-3);
+const exitFlock=makeFlock();  scene.add(exitFlock);  exitFlock.visible=false;
+
+// ─── LIGHTING ────────────────────────────────
+const ambientLight=new THREE.AmbientLight(0x1a2244,0.6);
+scene.add(ambientLight);
+const moonDirLight=new THREE.DirectionalLight(0x223355,0.35);
+moonDirLight.position.set(-10,3,-5); scene.add(moonDirLight);
+
+// ─── STORY SCRIPT ────────────────────────────
+const storyScript=[
+  {speaker:'내레이션', text:'어린왕자가 여섯 번째 행성에 도착했습니다.\n그 행성에는 가로등 하나와 가로등을 켜는 아저씨가 살고 있었습니다.', action:'arrive'},
+  {speaker:'가로등지기', text:'"안녕..." (가로등을 끕니다)', action:'extinguish'},
+  {speaker:'어린왕자', text:'"안녕하세요! 왜 가로등을 껐다 켰다 하는 거예요?"', action:'prince_talk'},
+  {speaker:'가로등지기', text:'"명령이야. 안녕." (또 가로등을 켭니다)', action:'light'},
+  {speaker:'어린왕자', text:'"무슨 명령이에요?"', action:'prince_talk'},
+  {speaker:'가로등지기', text:'"가로등을 끄는 명령. 잘 자. 안녕." (또 끕니다)\n\n예전엔 하루에 한 번만 켜고 껐는데... 그때부터 행성이 빨리 돌기 시작했지.', action:'extinguish'},
+  {speaker:'가로등지기', text:'"이제는 1분에 한 번씩 켰다 껐다 해야 해. 쉴 틈이 없어."', action:'light'},
+  {speaker:'어린왕자', text:'"그럼 쉬고 싶을 때는 어떻게 해요?"', action:'prince_talk'},
+  {speaker:'가로등지기', text:'"쉬고 싶으면 걸으면 되지. 그런데 그게 무슨 소용이야..." (또 끕니다)', action:'extinguish'},
+  {speaker:'내레이션', text:'어린왕자는 생각했습니다.\n\n"이 사람은 어리석지 않아. 일이 있고, 명령에 충실하니까.\n저 사람이 다른 행성 사람들에게 업신여김 받는 게 아깝다."', action:'narrate'},
+  {speaker:'어린왕자', text:'"아저씨... 저는 이제 떠나야 해요. 안녕히 계세요."', action:'prince_leave'},
+  {speaker:'가로등지기', text:'"잘 가." (가로등을 켭니다)\n\n"저 아이와 함께라면 우리는 친구가 될 수 있었을 텐데..."', action:'light_final'},
+];
+
+// ─── RAYCASTER ───────────────────────────────
+const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+let clickableObjects=[];
+
+function setupTypes(){
+  lampGroup.traverse(o=>{if(o.isMesh)o.userData.type='lamp';});
+  lamplighterGroup.traverse(o=>{if(o.isMesh)o.userData.type='lamplighter';});
+  princeGroup.traverse(o=>{if(o.isMesh)o.userData.type='prince';});
+}
+setupTypes();
+
+function updateClickables(){
+  clickableObjects=[];
+  if(gameState==='free'){
+    lamplighterGroup.traverse(o=>{if(o.isMesh)clickableObjects.push(o);});
+    if(princeGroup.visible) princeGroup.traverse(o=>{if(o.isMesh)clickableObjects.push(o);});
+    if(isPaused) lampGroup.traverse(o=>{if(o.isMesh)clickableObjects.push(o);});
+  }
+}
+
+function findType(m){
+  let o=m;
+  while(o){ if(o===lamplighterGroup)return 'lamplighter'; if(o===princeGroup)return 'prince'; if(o===lampGroup)return 'lamp'; o=o.parent; }
+  return null;
+}
+
+// ─── HELPERS ─────────────────────────────────
+function setLamp(on,anim=true){
+  lampOn=on;
+  if(on){if(anim)triggerLampAnim('lighting');else{lampLight.intensity=2.5;bulbMat.emissiveIntensity=2.5;glowMat.opacity=0.25;}}
+  else  {if(anim)triggerLampAnim('extinguishing');else{lampLight.intensity=0;bulbMat.emissiveIntensity=0.1;glowMat.opacity=0;}}
+}
+function triggerLampAnim(a){if(lamplighterAnimating)return; lamplighterAnimating=true; lamplighterAction=a; lamplighterAnimFrame=0;}
+
+function showFloatBubble(who,text,dur=3000){
+  const el=document.getElementById(who==='prince'?'prince-bubble':'lamplighter-bubble');
+  el.textContent=text; el.classList.add('visible');
+  if(dur>0)setTimeout(()=>el.classList.remove('visible'),dur);
+}
+
+function showStoryBubble(step){
+  const s=storyScript[step];
+  document.getElementById('bubble-speaker').textContent=s.speaker;
+  document.getElementById('bubble-text').textContent=s.text;
+  const b=document.getElementById('story-bubble'); b.classList.add('visible','clickable');
+  switch(s.action){
+    case 'arrive': princeGroup.visible=true; break;
+    case 'extinguish': setLamp(false,true); break;
+    case 'light': case 'light_final': setLamp(true,true); break;
+  }
+}
+
+function nextStory(){
+  storyStep++;
+  if(storyStep>=storyScript.length){document.getElementById('story-bubble').classList.remove('visible','clickable'); enterFreeMode(); return;}
+  showStoryBubble(storyStep);
+}
+
+function enterFreeMode(){
+  gameState='free';
+  document.getElementById('free-ui').classList.add('visible');
+  document.getElementById('time-indicator').classList.add('visible');
+  document.getElementById('hint-text').textContent='캐릭터를 클릭해 보세요!';
+  document.getElementById('hint-text').classList.add('visible');
+  princeGroup.visible=true; updateClickables();
+  setTimeout(()=>document.getElementById('hint-text').classList.remove('visible'),4000);
+}
+
+// ─── BUBBLE SCREEN POS ───────────────────────
+function updateBubblePos(){
+  if(gameState!=='free')return;
+  [[princeGroup,'prince-bubble'],[lamplighterGroup,'lamplighter-bubble']].forEach(([grp,id])=>{
+    const wp=new THREE.Vector3(); grp.getWorldPosition(wp); wp.y+=1.0;
+    const p=wp.clone().project(camera);
+    const x=(p.x*.5+.5)*window.innerWidth, y=(-p.y*.5+.5)*window.innerHeight;
+    const el=document.getElementById(id);
+    el.style.left=(x-el.offsetWidth/2)+'px'; el.style.top=(y-el.offsetHeight-15)+'px';
+  });
+}
+
+// ─── SPACE / DAY-NIGHT ───────────────────────
+const ONE_MIN=60;
+function updateSpace(dt){
+  if(isPaused)return;
+  spaceAngle += dt*(Math.PI*2/ONE_MIN)*rotationSpeed;
+  spaceGroup.rotation.z=spaceAngle;
+
+  // 태양 x좌표(월드): cos(spaceAngle)*16
+  const sunX=Math.cos(spaceAngle)*16;
+  const wasDay=isDay; isDay=sunX>0;
+  const dayF=Math.max(0,Math.cos(spaceAngle));
+
+  sunLight.intensity=0.8+dayF*3.0;
+  ambientLight.intensity=0.25+dayF*0.55;
+  scene.background=new THREE.Color(0x010115).lerp(new THREE.Color(0x0a0825),dayF*0.45);
+
+  if(gameState==='free'&&wasDay!==isDay){
+    if(!isDay&&!lampOn)setLamp(true,true);
+    else if(isDay&&lampOn)setLamp(false,true);
+  }
+  document.getElementById('time-indicator').textContent=isDay?'☀️ 낮':'🌙 밤';
+}
+
+// ─── LAMPLIGHTER ANIM ────────────────────────
+function updateLampAnim(dt){
+  if(!lamplighterAnimating)return;
+  lamplighterAnimFrame+=dt*60;
+  const stick=lamplighter.getObjectByName('stick');
+  const rArm=lamplighter.getObjectByName('rightArm');
+  const t=Math.min(lamplighterAnimFrame/60,1), e=t<.5?2*t*t:-1+(4-2*t)*t;
+  if(lamplighterAction==='lighting'){
+    if(stick)stick.rotation.z=-0.3+e*(-1.4);
+    if(rArm)rArm.rotation.z=-0.4+e*(-0.9);
+    lampLight.intensity=e*2.5; bulbMat.emissiveIntensity=0.1+e*2.4; glowMat.opacity=e*0.25;
+  } else {
+    if(stick)stick.rotation.z=-1.7+e*1.4;
+    if(rArm)rArm.rotation.z=-1.3+e*0.9;
+    lampLight.intensity=2.5*(1-e); bulbMat.emissiveIntensity=2.5*(1-e*0.9); glowMat.opacity=0.25*(1-e);
+  }
+  if(t>=1){
+    lamplighterAnimating=false; lamplighterAnimFrame=0;
+    if(stick)stick.rotation.z=-0.3; if(rArm)rArm.rotation.z=-0.4;
+    if(lamplighterAction==='lighting'){lampLight.intensity=2.5;bulbMat.emissiveIntensity=2.5;glowMat.opacity=0.25;}
+    else{lampLight.intensity=0;bulbMat.emissiveIntensity=0.1;glowMat.opacity=0;}
+  }
+}
+
+// ─── BIRDS FLAP ──────────────────────────────
+function animBirds(grp,dt,spd=3){
+  wingFlapT+=dt*spd;
+  grp.traverse(c=>{
+    if(c.name==='leftWing')c.rotation.z=Math.sin(wingFlapT)*0.45;
+    if(c.name==='rightWing')c.rotation.z=Math.sin(wingFlapT)*0.45;
+  });
+}
+
+// ─── CAMERA DRAG ─────────────────────────────
+function camFromSphere(){
+  camera.position.x=camRadius*Math.sin(camPhi)*Math.sin(camTheta);
+  camera.position.y=camRadius*Math.cos(camPhi)+0.5;
+  camera.position.z=camRadius*Math.sin(camPhi)*Math.cos(camTheta);
+  camera.lookAt(CAM_TARGET);
+}
+
+renderer.domElement.addEventListener('mousedown',e=>{
+  if(!isPaused||gameState!=='free')return;
+  isDragging=true; dragPrev={x:e.clientX,y:e.clientY};
+});
+window.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  const dx=(e.clientX-dragPrev.x)*0.006, dy=(e.clientY-dragPrev.y)*0.006;
+  camTheta-=dx; camPhi=Math.max(0.12,Math.min(Math.PI*0.88,camPhi+dy));
+  dragPrev={x:e.clientX,y:e.clientY};
+  camFromSphere();
+});
+window.addEventListener('mouseup',()=>isDragging=false);
+
+// ─── EVENTS ──────────────────────────────────
+document.getElementById('start-btn').addEventListener('click',()=>{
+  gameState='flying';
+  document.getElementById('title-screen').classList.add('hidden');
+  setTimeout(()=>{document.getElementById('title-screen').style.display='none'; startFly();},1500);
+});
+document.getElementById('story-bubble').addEventListener('click',()=>{if(gameState==='story')nextStory();});
+document.getElementById('story-mode-btn').addEventListener('click',()=>{
+  document.getElementById('mode-select').classList.remove('visible');
+  gameState='story'; storyStep=0; showStoryBubble(0);
+});
+document.getElementById('free-mode-btn').addEventListener('click',()=>{
+  document.getElementById('mode-select').classList.remove('visible'); enterFreeMode();
+});
+document.getElementById('pause-btn').addEventListener('click',()=>{
+  isPaused=!isPaused;
+  document.getElementById('pause-btn').textContent=isPaused?'▶ 재생':'⏸ 일시정지';
+  updateClickables();
+  if(isPaused){
+    document.getElementById('drag-hint').classList.add('visible');
+    document.getElementById('hint-text').textContent='가로등을 클릭해서 켜고 끌 수 있어요!';
+    document.getElementById('hint-text').classList.add('visible');
+    setTimeout(()=>document.getElementById('hint-text').classList.remove('visible'),3500);
+  } else {
+    document.getElementById('drag-hint').classList.remove('visible');
+    camTheta=0; camPhi=0.28; camera.position.set(0,2.5,9); camera.lookAt(CAM_TARGET);
+  }
+});
+document.getElementById('speed-slider').addEventListener('input',e=>rotationSpeed=parseFloat(e.target.value));
+document.getElementById('exit-btn').addEventListener('click',startExit);
+
+window.addEventListener('click',e=>{
+  if(gameState!=='free'||e.target!==renderer.domElement||isDragging)return;
+  mouse.x=(e.clientX/window.innerWidth)*2-1;
+  mouse.y=-(e.clientY/window.innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(clickableObjects,true);
+  if(hits.length>0){
+    const type=findType(hits[0].object)||hits[0].object.userData.type;
+    if(type==='lamp'&&isPaused)setLamp(!lampOn,true);
+    else if(type==='lamplighter')showFloatBubble('lamplighter','안녕! 바빠서 말 못해! 😅',2500);
+    else if(type==='prince')showFloatBubble('prince','안녕하세요! ✨',2500);
+  }
+});
+
+// ─── FLYING ──────────────────────────────────
+function startFly(){
+  flyingActive=true; flyingPhase=0; flyingT=0;
+  planetGroup.position.set(8,0,-5); planetGroup.scale.setScalar(0.25);
+  titleFlock.position.set(-14,1,-3); titleFlock.visible=true;
+}
+function updateFly(dt){
+  flyingT+=dt; animBirds(titleFlock,dt);
+  if(flyingPhase===0){
+    const t=Math.min(flyingT/3,1), e=t<.5?2*t*t:-1+(4-2*t)*t;
+    titleFlock.position.x=-14+e*20; titleFlock.position.y=1+Math.sin(t*Math.PI)*1.5+Math.sin(flyingT*2)*0.2;
+    const pt=Math.min(flyingT/4,1);
+    planetGroup.position.x=8*(1-pt); planetGroup.position.z=-5+pt*5; planetGroup.scale.setScalar(0.25+pt*0.75);
+    if(flyingT>2.5){flyingPhase=1;flyingT=0;}
+  } else if(flyingPhase===1){
+    const t=Math.min(flyingT/2.5,1),e=t<.5?2*t*t:-1+(4-2*t)*t;
+    titleFlock.position.x=6+e*(-6); titleFlock.position.y=3-e*2.8; titleFlock.position.z=-3+e*3;
+    titleFlock.scale.setScalar(1.2*(1-t*0.6)); planetGroup.scale.setScalar(1); planetGroup.position.set(0,0,0);
+    if(t>=1){flyingPhase=2;flyingT=0;}
+  } else {
+    const t=Math.min(flyingT/0.8,1); titleFlock.scale.setScalar(0.5*(1-t));
+    if(t>=1){titleFlock.visible=false;flyingActive=false;gameState='modeSelect';princeGroup.visible=true;document.getElementById('mode-select').classList.add('visible');}
+  }
+}
+
+// ─── EXIT ────────────────────────────────────
+function startExit(){
+  exitActive=true;exitPhase=0;exitT=0;
+  exitFlock.visible=true;exitFlock.position.set(0,9,-2);exitFlock.scale.setScalar(1.2);
+  document.getElementById('free-ui').classList.remove('visible');
+  document.getElementById('time-indicator').classList.remove('visible');
+  document.getElementById('drag-hint').classList.remove('visible');
+}
+function updateExit(dt){
+  exitT+=dt; animBirds(exitFlock,dt);
+  if(exitPhase===0){
+    const t=Math.min(exitT/1.5,1); exitFlock.position.y=9-t*7.5;
+    if(t>=1){exitPhase=1;exitT=0;princeGroup.visible=false;}
+  } else if(exitPhase===1){
+    const t=Math.min(exitT/2,1),e=t<.5?2*t*t:-1+(4-2*t)*t;
+    exitFlock.position.x=e*16; exitFlock.position.y=1.5+e*7;
+    if(t>=1){exitPhase=2;exitT=0;}
+  } else {
+    const fade=document.getElementById('fade-overlay'), t=Math.min(exitT/1.5,1);
+    fade.style.opacity=t;
+    if(t>=1){
+      exitActive=false;exitFlock.visible=false;gameState='title';
+      isPaused=false;camTheta=0;camPhi=0.28;
+      camera.position.set(0,2.5,9);camera.lookAt(CAM_TARGET);
+      titleFlock.visible=true;titleFlock.position.set(-12,2,-3);titleFlock.scale.setScalar(1.2);
+      princeGroup.visible=false;planetGroup.scale.setScalar(1);planetGroup.position.set(0,0,0);
+      document.getElementById('title-screen').style.display='flex';
+      setTimeout(()=>{document.getElementById('title-screen').classList.remove('hidden');document.getElementById('title-screen').style.opacity='1';fade.style.opacity=0;},100);
+    }
+  }
+}
+
+// ─── MAIN LOOP ───────────────────────────────
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta(); elapsed+=dt;
+  if(gameState==='flying') updateFly(dt);
+  if(gameState==='free'||gameState==='story'){ updateSpace(dt); updateLampAnim(dt); updateBubblePos(); }
+  if(gameState==='title'||gameState==='loading'){
+    animBirds(titleFlock,dt);
+    titleFlock.position.y=2+Math.sin(elapsed*.5)*.3;
+    titleFlock.position.x=-12+Math.sin(elapsed*.2)*.4;
+  }
+  if(exitActive) updateExit(dt);
+  renderer.render(scene,camera);
+}
+
+// ─── INIT ────────────────────────────────────
+setLamp(true,false);
+setTimeout(()=>{document.getElementById('loading').style.display='none'; gameState='title';},400);
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+animate();
+</script>
+</body>
+</html>
